@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Estoque por Gramas</title>
+<title>Controle de Estoque por Gramas</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -16,6 +16,15 @@ body{
 }
 .low-stock{
     background-color:#ffe5e5 !important;
+}
+.unidades-alerta{
+    background-color:#dc3545 !important;
+    color:white !important;
+    font-weight:bold;
+    text-align:center;
+}
+.badge-alerta{
+    background:#dc3545;
 }
 </style>
 </head>
@@ -57,7 +66,7 @@ body{
 <tr>
 <th>Produto</th>
 <th>Estoque (g)</th>
-<th>Mínimo</th>
+<th>Mínimo (g)</th>
 <th>Uso (g)</th>
 <th>Unidades Possíveis</th>
 <th>Entrada</th>
@@ -86,7 +95,7 @@ function adicionarProduto(){
     let uso = parseFloat(document.getElementById("uso").value);
 
     if(!nome || isNaN(estoque) || isNaN(uso)){
-        alert("Preencha os campos corretamente");
+        alert("Preencha corretamente os campos obrigatórios.");
         return;
     }
 
@@ -145,15 +154,21 @@ function renderizar(){
     produtos.forEach((p,index)=>{
 
         let unidades = p.uso > 0 ? Math.floor(p.estoque / p.uso) : 0;
-        let classe = p.estoque <= p.minimo ? "low-stock" : "";
+        let estoqueBaixo = p.estoque <= p.minimo;
+
+        let classeLinha = estoqueBaixo ? "low-stock" : "";
+        let classeUnidades = estoqueBaixo ? "unidades-alerta" : "text-success fw-bold text-center";
 
         tabela.innerHTML+=`
-        <tr class="${classe}">
-        <td><strong>${p.nome}</strong></td>
+        <tr class="${classeLinha}">
+        <td>
+            <strong>${p.nome}</strong>
+            ${estoqueBaixo ? '<span class="badge badge-alerta ms-2">Estoque Baixo</span>' : ''}
+        </td>
         <td>${p.estoque.toFixed(2)} g</td>
         <td>${p.minimo} g</td>
         <td>${p.uso} g</td>
-        <td class="text-success fw-bold">${unidades}</td>
+        <td class="${classeUnidades}">${unidades}</td>
         <td><button class="btn btn-success btn-sm" onclick="entrada(${index})">+</button></td>
         <td><button class="btn btn-warning btn-sm" onclick="saida(${index})">-</button></td>
         <td><button class="btn btn-danger btn-sm" onclick="remover(${index})">X</button></td>
