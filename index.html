@@ -3,78 +3,63 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Controle de Estoque por Gramas</title>
+<title>Estoque Profissional</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-body{
-    background:#f4f6f9;
-}
-.card{
-    border-radius:12px;
-}
-.low-stock{
-    background-color:#ffe5e5 !important;
-}
+body{background:#f4f6f9;}
+.low-stock{background:#ffe5e5 !important;}
 .unidades-alerta{
-    background-color:#dc3545 !important;
-    color:white !important;
+    background:#dc3545 !important;
+    color:#fff !important;
     font-weight:bold;
     text-align:center;
 }
-.badge-alerta{
-    background:#dc3545;
-}
+.badge-alerta{background:#dc3545;}
 </style>
 </head>
 <body>
 
 <div class="container mt-4">
 
-<h2 class="mb-4">📦 Controle de Estoque (GitHub Pages)</h2>
+<h3>📦 Controle de Estoque</h3>
 
-<div class="card p-3 mb-4 shadow-sm">
-<h5>Cadastrar Produto</h5>
-
+<div class="card p-3 mb-3">
 <div class="row g-2">
 <div class="col-md-3">
-<input type="text" id="nome" class="form-control" placeholder="Nome do Produto">
+<input id="nome" class="form-control" placeholder="Produto">
 </div>
-
 <div class="col-md-2">
-<input type="number" id="estoque" class="form-control" placeholder="Estoque (g)">
+<input id="estoque" type="number" class="form-control" placeholder="Estoque (g)">
 </div>
-
 <div class="col-md-2">
-<input type="number" id="minimo" class="form-control" placeholder="Estoque mínimo (g)">
+<input id="minimo" type="number" class="form-control" placeholder="Mínimo (g)">
 </div>
-
 <div class="col-md-2">
-<input type="number" id="uso" class="form-control" placeholder="Uso por unidade (g)">
+<input id="uso" type="number" class="form-control" placeholder="Uso por unidade (g)">
 </div>
-
 <div class="col-md-2">
-<button class="btn btn-primary w-100" onclick="adicionarProduto()">Adicionar</button>
+<button class="btn btn-primary w-100" onclick="adicionar()">Adicionar</button>
 </div>
 </div>
 </div>
 
-<div class="card p-3 shadow-sm">
-<table class="table table-bordered align-middle">
+<div class="card p-3">
+<table class="table table-bordered">
 <thead class="table-dark">
 <tr>
 <th>Produto</th>
-<th>Estoque (g)</th>
-<th>Mínimo (g)</th>
-<th>Uso (g)</th>
-<th>Unidades Possíveis</th>
-<th>Entrada</th>
-<th>Saída</th>
-<th>Excluir</th>
+<th>Estoque</th>
+<th>Mínimo</th>
+<th>Uso</th>
+<th>Unidades</th>
+<th>+</th>
+<th>-</th>
+<th>X</th>
 </tr>
 </thead>
-<tbody id="tabelaProdutos"></tbody>
+<tbody id="tabela"></tbody>
 </table>
 </div>
 
@@ -82,102 +67,109 @@ body{
 
 <script>
 
-let produtos = JSON.parse(localStorage.getItem("estoque_produtos")) || [];
+const STORAGE_KEY = "estoque_sistema_v2";
 
-function salvar(){
-    localStorage.setItem("estoque_produtos", JSON.stringify(produtos));
+function carregar(){
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
 }
 
-function adicionarProduto(){
+function salvar(dados){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dados));
+}
+
+function adicionar(){
+    let produtos = carregar();
+
     let nome = document.getElementById("nome").value.trim();
     let estoque = parseFloat(document.getElementById("estoque").value);
-    let minimo = parseFloat(document.getElementById("minimo").value);
+    let minimo = parseFloat(document.getElementById("minimo").value) || 0;
     let uso = parseFloat(document.getElementById("uso").value);
 
     if(!nome || isNaN(estoque) || isNaN(uso)){
-        alert("Preencha corretamente os campos obrigatórios.");
+        alert("Preencha corretamente");
         return;
     }
 
     produtos.push({
+        id: Date.now(),
         nome,
         estoque,
-        minimo: minimo || 0,
+        minimo,
         uso
     });
 
-    limparCampos();
-    salvar();
-    renderizar();
+    salvar(produtos);
+    limpar();
+    render();
 }
 
-function limparCampos(){
+function limpar(){
     document.getElementById("nome").value="";
     document.getElementById("estoque").value="";
     document.getElementById("minimo").value="";
     document.getElementById("uso").value="";
 }
 
-function entrada(index){
-    let valor = parseFloat(prompt("Quantidade de entrada (g):"));
-    if(!isNaN(valor) && valor > 0){
-        produtos[index].estoque += valor;
-        salvar();
-        renderizar();
-    }
-}
+function movimentar(id,tipo){
+    let produtos = carregar();
+    let valor = parseFloat(prompt("Quantidade (g):"));
 
-function saida(index){
-    let valor = parseFloat(prompt("Quantidade de saída (g):"));
-    if(!isNaN(valor) && valor > 0){
-        produtos[index].estoque -= valor;
-        if(produtos[index].estoque < 0){
-            produtos[index].estoque = 0;
+    if(isNaN(valor) || valor <= 0) return;
+
+    produtos = produtos.map(p=>{
+        if(p.id === id){
+            if(tipo === "entrada"){
+                p.estoque += valor;
+            }else{
+                p.estoque -= valor;
+                if(p.estoque < 0) p.estoque = 0;
+            }
         }
-        salvar();
-        renderizar();
-    }
+        return p;
+    });
+
+    salvar(produtos);
+    render();
 }
 
-function remover(index){
-    if(confirm("Deseja remover o produto?")){
-        produtos.splice(index,1);
-        salvar();
-        renderizar();
-    }
+function remover(id){
+    let produtos = carregar();
+    produtos = produtos.filter(p=>p.id !== id);
+    salvar(produtos);
+    render();
 }
 
-function renderizar(){
-    let tabela = document.getElementById("tabelaProdutos");
+function render(){
+    let produtos = carregar();
+    let tabela = document.getElementById("tabela");
     tabela.innerHTML="";
 
-    produtos.forEach((p,index)=>{
+    produtos.forEach(p=>{
 
         let unidades = p.uso > 0 ? Math.floor(p.estoque / p.uso) : 0;
         let estoqueBaixo = p.estoque <= p.minimo;
 
-        let classeLinha = estoqueBaixo ? "low-stock" : "";
-        let classeUnidades = estoqueBaixo ? "unidades-alerta" : "text-success fw-bold text-center";
-
-        tabela.innerHTML+=`
-        <tr class="${classeLinha}">
+        tabela.innerHTML += `
+        <tr class="${estoqueBaixo ? 'low-stock':''}">
         <td>
             <strong>${p.nome}</strong>
-            ${estoqueBaixo ? '<span class="badge badge-alerta ms-2">Estoque Baixo</span>' : ''}
+            ${estoqueBaixo ? '<span class="badge badge-alerta ms-2">Estoque Baixo</span>':''}
         </td>
         <td>${p.estoque.toFixed(2)} g</td>
         <td>${p.minimo} g</td>
         <td>${p.uso} g</td>
-        <td class="${classeUnidades}">${unidades}</td>
-        <td><button class="btn btn-success btn-sm" onclick="entrada(${index})">+</button></td>
-        <td><button class="btn btn-warning btn-sm" onclick="saida(${index})">-</button></td>
-        <td><button class="btn btn-danger btn-sm" onclick="remover(${index})">X</button></td>
+        <td class="${estoqueBaixo ? 'unidades-alerta':'text-success fw-bold text-center'}">
+            ${unidades}
+        </td>
+        <td><button class="btn btn-success btn-sm" onclick="movimentar(${p.id},'entrada')">+</button></td>
+        <td><button class="btn btn-warning btn-sm" onclick="movimentar(${p.id},'saida')">-</button></td>
+        <td><button class="btn btn-danger btn-sm" onclick="remover(${p.id})">X</button></td>
         </tr>
         `;
     });
 }
 
-renderizar();
+render();
 
 </script>
 
