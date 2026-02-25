@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Estoque Profissional</title>
+<title>Estoque Supabase</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -12,7 +12,7 @@ body{background:#f4f6f9;}
 .low-stock{background:#ffe5e5 !important;}
 .unidades-alerta{
     background:#dc3545 !important;
-    color:#fff !important;
+    color:white !important;
     font-weight:bold;
     text-align:center;
 }
@@ -23,7 +23,7 @@ body{background:#f4f6f9;}
 
 <div class="container mt-4">
 
-<h3>📦 Controle de Estoque</h3>
+<h3>📦 Controle de Estoque (Supabase)</h3>
 
 <div class="card p-3 mb-3">
 <div class="row g-2">
@@ -65,88 +65,26 @@ body{background:#f4f6f9;}
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 
-const STORAGE_KEY = "estoque_sistema_v2";
+const SUPABASE_URL = "https://lpmhnbmjcwtcpqdozkux.supabase.co";
+const SUPABASE_KEY = "lpmhnbmjcwtcpqdozkux";
 
-function carregar(){
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const tabela = document.getElementById("tabela");
+
+async function carregar(){
+    const { data } = await supabase.from("produtos").select("*").order("created_at");
+    render(data);
 }
 
-function salvar(dados){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(dados));
-}
-
-function adicionar(){
-    let produtos = carregar();
-
-    let nome = document.getElementById("nome").value.trim();
-    let estoque = parseFloat(document.getElementById("estoque").value);
-    let minimo = parseFloat(document.getElementById("minimo").value) || 0;
-    let uso = parseFloat(document.getElementById("uso").value);
-
-    if(!nome || isNaN(estoque) || isNaN(uso)){
-        alert("Preencha corretamente");
-        return;
-    }
-
-    produtos.push({
-        id: Date.now(),
-        nome,
-        estoque,
-        minimo,
-        uso
-    });
-
-    salvar(produtos);
-    limpar();
-    render();
-}
-
-function limpar(){
-    document.getElementById("nome").value="";
-    document.getElementById("estoque").value="";
-    document.getElementById("minimo").value="";
-    document.getElementById("uso").value="";
-}
-
-function movimentar(id,tipo){
-    let produtos = carregar();
-    let valor = parseFloat(prompt("Quantidade (g):"));
-
-    if(isNaN(valor) || valor <= 0) return;
-
-    produtos = produtos.map(p=>{
-        if(p.id === id){
-            if(tipo === "entrada"){
-                p.estoque += valor;
-            }else{
-                p.estoque -= valor;
-                if(p.estoque < 0) p.estoque = 0;
-            }
-        }
-        return p;
-    });
-
-    salvar(produtos);
-    render();
-}
-
-function remover(id){
-    let produtos = carregar();
-    produtos = produtos.filter(p=>p.id !== id);
-    salvar(produtos);
-    render();
-}
-
-function render(){
-    let produtos = carregar();
-    let tabela = document.getElementById("tabela");
-    tabela.innerHTML="";
+function render(produtos){
+    tabela.innerHTML = "";
 
     produtos.forEach(p=>{
-
-        let unidades = p.uso > 0 ? Math.floor(p.estoque / p.uso) : 0;
+        let unidades = Math.floor(p.estoque / p.uso);
         let estoqueBaixo = p.estoque <= p.minimo;
 
         tabela.innerHTML += `
@@ -155,21 +93,65 @@ function render(){
             <strong>${p.nome}</strong>
             ${estoqueBaixo ? '<span class="badge badge-alerta ms-2">Estoque Baixo</span>':''}
         </td>
-        <td>${p.estoque.toFixed(2)} g</td>
+        <td>${Number(p.estoque).toFixed(2)} g</td>
         <td>${p.minimo} g</td>
         <td>${p.uso} g</td>
         <td class="${estoqueBaixo ? 'unidades-alerta':'text-success fw-bold text-center'}">
             ${unidades}
         </td>
-        <td><button class="btn btn-success btn-sm" onclick="movimentar(${p.id},'entrada')">+</button></td>
-        <td><button class="btn btn-warning btn-sm" onclick="movimentar(${p.id},'saida')">-</button></td>
-        <td><button class="btn btn-danger btn-sm" onclick="remover(${p.id})">X</button></td>
+        <td><button class="btn btn-success btn-sm" onclick="entrada('${p.id}', ${p.estoque})">+</button></td>
+        <td><button class="btn btn-warning btn-sm" onclick="saida('${p.id}', ${p.estoque})">-</button></td>
+        <td><button class="btn btn-danger btn-sm" onclick="remover('${p.id}')">X</button></td>
         </tr>
         `;
     });
 }
 
-render();
+async function adicionar(){
+    let nome = document.getElementById("nome").value;
+    let estoque = parseFloat(document.getElementById("estoque").value);
+    let minimo = parseFloat(document.getElementById("minimo").value) || 0;
+    let uso = parseFloat(document.getElementById("uso").value);
+
+    if(!nome || !estoque || !uso) return alert("Preencha corretamente");
+
+    await supabase.from("produtos").insert([{ nome, estoque, minimo, uso }]);
+
+    document.querySelectorAll("input").forEach(i=>i.value="");
+    carregar();
+}
+
+async function entrada(id, atual){
+    let valor = parseFloat(prompt("Quantidade (g):"));
+    if(!valor) return;
+
+    await supabase.from("produtos")
+    .update({ estoque: atual + valor })
+    .eq("id", id);
+
+    carregar();
+}
+
+async function saida(id, atual){
+    let valor = parseFloat(prompt("Quantidade (g):"));
+    if(!valor) return;
+
+    let novo = atual - valor;
+    if(novo < 0) novo = 0;
+
+    await supabase.from("produtos")
+    .update({ estoque: novo })
+    .eq("id", id);
+
+    carregar();
+}
+
+async function remover(id){
+    await supabase.from("produtos").delete().eq("id", id);
+    carregar();
+}
+
+carregar();
 
 </script>
 
