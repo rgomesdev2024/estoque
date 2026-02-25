@@ -9,58 +9,80 @@
 
 <style>
 body{background:#f4f6f9;}
+
 .low-stock{background:#ffe5e5 !important;}
+
 .unidades-alerta{
     background:#dc3545 !important;
     color:white !important;
     font-weight:bold;
     text-align:center;
 }
+
 .badge-alerta{background:#dc3545;}
+
+/* Melhorias mobile */
+@media(max-width:768px){
+    h3{font-size:18px;}
+    .card{padding:15px !important;}
+}
 </style>
 </head>
 <body>
 
 <div class="container mt-4">
 
-<h3>📦 Controle de Estoque (Supabase)</h3>
+<h3 class="mb-3">📦 Controle de Estoque (Supabase)</h3>
 
+<!-- FORMULÁRIO RESPONSIVO -->
 <div class="card p-3 mb-3">
 <div class="row g-2">
-<div class="col-md-3">
+
+<div class="col-12 col-md-3">
 <input id="nome" class="form-control" placeholder="Produto">
 </div>
-<div class="col-md-2">
+
+<div class="col-6 col-md-2">
 <input id="estoque" type="number" class="form-control" placeholder="Estoque (g)">
 </div>
-<div class="col-md-2">
+
+<div class="col-6 col-md-2">
 <input id="minimo" type="number" class="form-control" placeholder="Mínimo (g)">
 </div>
-<div class="col-md-2">
+
+<div class="col-6 col-md-2">
 <input id="uso" type="number" class="form-control" placeholder="Uso por unidade (g)">
 </div>
-<div class="col-md-2">
-<button class="btn btn-primary w-100" onclick="adicionar()">Adicionar</button>
+
+<div class="col-6 col-md-2 d-grid">
+<button class="btn btn-primary" onclick="adicionar()">Adicionar</button>
 </div>
+
 </div>
 </div>
 
+<!-- TABELA RESPONSIVA -->
 <div class="card p-3">
-<table class="table table-bordered">
+<div class="table-responsive">
+
+<table class="table table-bordered table-hover align-middle text-center">
+
 <thead class="table-dark">
 <tr>
 <th>Produto</th>
 <th>Estoque</th>
-<th>Mínimo</th>
-<th>Uso</th>
+<th class="d-none d-md-table-cell">Mínimo</th>
+<th class="d-none d-md-table-cell">Uso</th>
 <th>Unidades</th>
-<th>+</th>
-<th>-</th>
-<th>X</th>
+<th colspan="3">Ações</th>
 </tr>
 </thead>
+
 <tbody id="tabela"></tbody>
+
 </table>
+
+</div>
 </div>
 
 </div>
@@ -69,10 +91,9 @@ body{background:#f4f6f9;}
 <script>
 
 const SUPABASE_URL = "https://lpmhnbmjcwtcpqdozkux.supabase.co";
-const SUPABASE_KEY = "sb_publishable_-uVm2RyBtxwN0emuW5Xtwg_vt0n994I";
+const SUPABASE_KEY = "SUA_ANON_KEY_COMPLETA_AQUI";
 
-/* ✅ Forma correta Supabase v2 */
-const { createClient } = supabase;
+const { createClient } = window.supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const tabela = document.getElementById("tabela");
@@ -100,19 +121,39 @@ function render(produtos){
 
         tabela.innerHTML += `
         <tr class="${estoqueBaixo ? 'low-stock':''}">
-        <td>
+        
+        <td class="text-start">
             <strong>${p.nome}</strong>
-            ${estoqueBaixo ? '<span class="badge badge-alerta ms-2">Estoque Baixo</span>':''}
+            ${estoqueBaixo ? 
+                '<div><span class="badge badge-alerta mt-1">Estoque Baixo</span></div>' 
+                : ''
+            }
         </td>
+
         <td>${Number(p.estoque).toFixed(2)} g</td>
-        <td>${p.minimo} g</td>
-        <td>${p.uso} g</td>
-        <td class="${estoqueBaixo ? 'unidades-alerta':'text-success fw-bold text-center'}">
+
+        <td class="d-none d-md-table-cell">${p.minimo} g</td>
+        <td class="d-none d-md-table-cell">${p.uso} g</td>
+
+        <td class="${estoqueBaixo ? 'unidades-alerta':'text-success fw-bold'}">
             ${unidades}
         </td>
-        <td><button class="btn btn-success btn-sm" onclick="entrada('${p.id}', ${p.estoque})">+</button></td>
-        <td><button class="btn btn-warning btn-sm" onclick="saida('${p.id}', ${p.estoque})">-</button></td>
-        <td><button class="btn btn-danger btn-sm" onclick="remover('${p.id}')">X</button></td>
+
+        <td>
+            <button class="btn btn-success btn-sm w-100"
+            onclick="entrada('${p.id}', ${p.estoque})">+</button>
+        </td>
+
+        <td>
+            <button class="btn btn-warning btn-sm w-100"
+            onclick="saida('${p.id}', ${p.estoque})">-</button>
+        </td>
+
+        <td>
+            <button class="btn btn-danger btn-sm w-100"
+            onclick="remover('${p.id}')">X</button>
+        </td>
+
         </tr>
         `;
     });
@@ -144,12 +185,10 @@ async function entrada(id, atual){
     let valor = parseFloat(prompt("Quantidade (g):"));
     if(!valor) return;
 
-    const { error } = await supabaseClient
+    await supabaseClient
         .from("produtos")
         .update({ estoque: atual + valor })
         .eq("id", id);
-
-    if(error) console.error(error);
 
     carregar();
 }
@@ -161,23 +200,19 @@ async function saida(id, atual){
     let novo = atual - valor;
     if(novo < 0) novo = 0;
 
-    const { error } = await supabaseClient
+    await supabaseClient
         .from("produtos")
         .update({ estoque: novo })
         .eq("id", id);
-
-    if(error) console.error(error);
 
     carregar();
 }
 
 async function remover(id){
-    const { error } = await supabaseClient
+    await supabaseClient
         .from("produtos")
         .delete()
         .eq("id", id);
-
-    if(error) console.error(error);
 
     carregar();
 }
