@@ -2,368 +2,222 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Estoque Delivery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estoque Dogão do Barriga</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
+body{background:#f4f6f9;}
 
-body{
-font-family:Arial;
-background:#f4f6f9;
-padding:20px;
+.low-stock{background:#ffe5e5 !important;}
+
+.unidades-alerta{
+    background:#dc3545 !important;
+    color:white !important;
+    font-weight:bold;
+    text-align:center;
 }
 
-.card{
-background:white;
-padding:20px;
-margin-bottom:20px;
-border-radius:10px;
-box-shadow:0 0 10px rgba(0,0,0,0.1);
-}
+.badge-alerta{background:#dc3545;}
 
-table{
-width:100%;
-border-collapse:collapse;
+/* Melhorias mobile */
+@media(max-width:768px){
+    h3{font-size:18px;}
+    .card{padding:15px !important;}
 }
-
-th,td{
-border:1px solid #ddd;
-padding:8px;
-text-align:center;
-}
-
-th{
-background:#333;
-color:white;
-}
-
-.alerta{
-background:#ffb3b3;
-}
-
-button{
-padding:6px 10px;
-cursor:pointer;
-}
-
 </style>
 </head>
-
 <body>
 
-<h2>📦 Dashboard Estoque</h2>
+<div class="container mt-4">
 
-<div class="card">
-<canvas id="grafico"></canvas>
+<h3 class="mb-3">📦 Controle de Estoque</h3>
+
+<!-- FORMULÁRIO RESPONSIVO -->
+<div class="card p-3 mb-3">
+<div class="row g-2">
+
+<div class="col-12 col-md-3">
+<input id="nome" class="form-control" placeholder="Produto">
 </div>
 
-<h2>➕ Cadastrar Insumo</h2>
-
-<div class="card">
-
-<input id="nomeInsumo" placeholder="Nome">
-<input id="unidade" placeholder="un / g">
-<input id="estoque" placeholder="Estoque">
-<input id="minimo" placeholder="Mínimo">
-<input id="custo" placeholder="Custo">
-
-<button onclick="cadastrarInsumo()">Salvar</button>
-
+<div class="col-6 col-md-2">
+<input id="estoque" type="number" class="form-control" placeholder="Estoque (g)">
 </div>
 
-<h2>📦 Insumos</h2>
-
-<div class="card">
-
-<table>
-
-<thead>
-<tr>
-<th>Nome</th>
-<th>Estoque</th>
-<th>Custo</th>
-<th>Entrada</th>
-<th>Saída</th>
-</tr>
-</thead>
-
-<tbody id="listaInsumos"></tbody>
-
-</table>
-
+<div class="col-6 col-md-2">
+<input id="minimo" type="number" class="form-control" placeholder="Mínimo (g)">
 </div>
 
-<h2>🍔 Produtos</h2>
+<div class="col-6 col-md-2">
+<input id="uso" type="number" class="form-control" placeholder="Uso por unidade (g)">
+</div>
 
-<div class="card">
+<div class="col-6 col-md-2 d-grid">
+<button class="btn btn-primary" onclick="adicionar()">Adicionar</button>
+</div>
 
-<input id="nomeProduto" placeholder="Produto">
-<input id="precoProduto" placeholder="Preço">
+</div>
+</div>
 
-<button onclick="cadastrarProduto()">Salvar</button>
+<!-- TABELA RESPONSIVA -->
+<div class="card p-3">
+<div class="table-responsive">
 
-<table>
+<table class="table table-bordered table-hover align-middle text-center">
 
-<thead>
+<thead class="table-dark">
 <tr>
 <th>Produto</th>
-<th>Preço</th>
-<th>Ficha</th>
-<th>Venda</th>
+<th>Estoque</th>
+<th class="d-none d-md-table-cell">Mínimo</th>
+<th class="d-none d-md-table-cell">Uso</th>
+<th>Unidades</th>
+<th colspan="3">Ações</th>
 </tr>
 </thead>
 
-<tbody id="listaProdutos"></tbody>
+<tbody id="tabela"></tbody>
 
 </table>
 
 </div>
-
-<h2>📊 Relatório de Consumo</h2>
-
-<div class="card">
-
-<table>
-
-<thead>
-<tr>
-<th>Tipo</th>
-<th>Quantidade</th>
-<th>Data</th>
-</tr>
-</thead>
-
-<tbody id="relatorio"></tbody>
-
-</table>
+</div>
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 
 const SUPABASE_URL = "https://lpmhnbmjcwtcpqdozkux.supabase.co";
 const SUPABASE_KEY = "sb_publishable_-uVm2RyBtxwN0emuW5Xtwg_vt0n994I";
 
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const { createClient } = window.supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function cadastrarInsumo(){
-
-let nome = nomeInsumo.value
-let unidade = unidade.value
-let estoque = parseFloat(document.getElementById("estoque").value)
-let minimo = parseFloat(document.getElementById("minimo").value)
-let custo = parseFloat(document.getElementById("custo").value)
-
-await db.from("insumos").insert([
-{nome, unidade, estoque, estoque_minimo:minimo, custo_unitario:custo}
-])
-
-carregar()
-
-}
+const tabela = document.getElementById("tabela");
 
 async function carregar(){
+    const { data, error } = await supabaseClient
+        .from("produtos")
+        .select("*")
+        .order("created_at");
 
-const {data:insumos} = await db.from("insumos").select("*")
+    if(error){
+        console.error(error);
+        return;
+    }
 
-listaInsumos.innerHTML=""
-
-insumos.forEach(i=>{
-
-let alerta = i.estoque <= i.estoque_minimo ? "alerta":""
-
-listaInsumos.innerHTML+=`
-
-<tr class="${alerta}">
-
-<td>${i.nome}</td>
-<td>${i.estoque}</td>
-<td>${i.custo_unitario}</td>
-
-<td>
-<button onclick="entrada('${i.id}',${i.estoque})">+</button>
-</td>
-
-<td>
-<button onclick="saida('${i.id}',${i.estoque})">-</button>
-</td>
-
-</tr>
-`
-
-})
-
-carregarProdutos()
-graficoEstoque(insumos)
-relatorio()
-
+    render(data);
 }
 
-async function entrada(id,estoque){
+function render(produtos){
+    tabela.innerHTML = "";
 
-let q = parseFloat(prompt("Quantidade"))
+    produtos.forEach(p=>{
+        let unidades = Math.floor(p.estoque / p.uso);
+        let estoqueBaixo = p.estoque <= p.minimo;
 
-await db.from("insumos")
-.update({estoque:estoque+q})
-.eq("id",id)
+        tabela.innerHTML += `
+        <tr class="${estoqueBaixo ? 'low-stock':''}">
+        
+        <td class="text-start">
+            <strong>${p.nome}</strong>
+            ${estoqueBaixo ? 
+                '<div><span class="badge badge-alerta mt-1">Estoque Baixo</span></div>' 
+                : ''
+            }
+        </td>
 
-await db.from("movimentacoes")
-.insert([{tipo:"entrada",insumo_id:id,quantidade:q}])
+        <td>${Number(p.estoque).toFixed(2)} g</td>
 
-carregar()
+        <td class="d-none d-md-table-cell">${p.minimo} g</td>
+        <td class="d-none d-md-table-cell">${p.uso} g</td>
 
+        <td class="${estoqueBaixo ? 'unidades-alerta':'text-success fw-bold'}">
+            ${unidades}
+        </td>
+
+        <td>
+            <button class="btn btn-success btn-sm w-100"
+            onclick="entrada('${p.id}', ${p.estoque})">+</button>
+        </td>
+
+        <td>
+            <button class="btn btn-warning btn-sm w-100"
+            onclick="saida('${p.id}', ${p.estoque})">-</button>
+        </td>
+
+        <td>
+            <button class="btn btn-danger btn-sm w-100"
+            onclick="remover('${p.id}')">X</button>
+        </td>
+
+        </tr>
+        `;
+    });
 }
 
-async function saida(id,estoque){
+async function adicionar(){
+    let nome = document.getElementById("nome").value;
+    let estoque = parseFloat(document.getElementById("estoque").value);
+    let minimo = parseFloat(document.getElementById("minimo").value) || 0;
+    let uso = parseFloat(document.getElementById("uso").value);
 
-let q = parseFloat(prompt("Quantidade"))
+    if(!nome || !estoque || !uso) 
+        return alert("Preencha corretamente");
 
-await db.from("insumos")
-.update({estoque:estoque-q})
-.eq("id",id)
+    const { error } = await supabaseClient
+        .from("produtos")
+        .insert([{ nome, estoque, minimo, uso }]);
 
-await db.from("movimentacoes")
-.insert([{tipo:"saida_insumo",insumo_id:id,quantidade:q}])
+    if(error){
+        console.error(error);
+        return alert("Erro ao inserir");
+    }
 
-carregar()
-
+    document.querySelectorAll("input").forEach(i=>i.value="");
+    carregar();
 }
 
-async function cadastrarProduto(){
+async function entrada(id, atual){
+    let valor = parseFloat(prompt("Quantidade (g):"));
+    if(!valor) return;
 
-let nome = nomeProduto.value
-let preco = parseFloat(precoProduto.value)
+    await supabaseClient
+        .from("produtos")
+        .update({ estoque: atual + valor })
+        .eq("id", id);
 
-await db.from("produtos")
-.insert([{nome,preco_venda:preco}])
-
-carregarProdutos()
-
+    carregar();
 }
 
-async function carregarProdutos(){
+async function saida(id, atual){
+    let valor = parseFloat(prompt("Quantidade (g):"));
+    if(!valor) return;
 
-const {data} = await db.from("produtos").select("*")
+    let novo = atual - valor;
+    if(novo < 0) novo = 0;
 
-listaProdutos.innerHTML=""
+    await supabaseClient
+        .from("produtos")
+        .update({ estoque: novo })
+        .eq("id", id);
 
-data.forEach(p=>{
-
-listaProdutos.innerHTML+=`
-
-<tr>
-
-<td>${p.nome}</td>
-<td>${p.preco_venda}</td>
-
-<td>
-<button onclick="abrirFicha('${p.id}')">
-Ficha
-</button>
-</td>
-
-<td>
-<button onclick="venda('${p.id}')">
-Venda
-</button>
-</td>
-
-</tr>
-`
-
-})
-
+    carregar();
 }
 
-async function venda(produtoId){
+async function remover(id){
+    await supabaseClient
+        .from("produtos")
+        .delete()
+        .eq("id", id);
 
-let qtd = parseInt(prompt("Quantidade vendida"))
-
-const {data:receita} = await db
-.from("ficha_tecnica")
-.select("*")
-.eq("produto_id",produtoId)
-
-for(let item of receita){
-
-let baixa = item.quantidade * qtd
-
-const {data:insumo} = await db
-.from("insumos")
-.select("estoque")
-.eq("id",item.insumo_id)
-.single()
-
-await db.from("insumos")
-.update({estoque:insumo.estoque - baixa})
-.eq("id",item.insumo_id)
-
-await db.from("movimentacoes")
-.insert([{
-tipo:"saida_produto",
-produto_id:produtoId,
-insumo_id:item.insumo_id,
-quantidade:baixa
-}])
-
+    carregar();
 }
 
-alert("Venda registrada")
-
-carregar()
-
-}
-
-async function graficoEstoque(insumos){
-
-let nomes = insumos.map(i=>i.nome)
-let estoque = insumos.map(i=>i.estoque)
-
-new Chart(document.getElementById("grafico"),{
-
-type:"bar",
-
-data:{
-labels:nomes,
-datasets:[{
-label:"Estoque",
-data:estoque
-}]
-}
-
-})
-
-}
-
-async function relatorio(){
-
-const {data} = await db
-.from("movimentacoes")
-.select("*")
-.order("data",{ascending:false})
-
-relatorio.innerHTML=""
-
-data.forEach(r=>{
-
-relatorio.innerHTML+=`
-
-<tr>
-<td>${r.tipo}</td>
-<td>${r.quantidade}</td>
-<td>${new Date(r.data).toLocaleString()}</td>
-</tr>
-
-`
-
-})
-
-}
-
-carregar()
+carregar();
 
 </script>
 
